@@ -1,6 +1,6 @@
 # api-playground
 
-Interactive API playground for testing fleet endpoints
+API Playground for fleet endpoints.
 
 Part of the [Cocapn fleet](https://github.com/Lucineer/the-fleet).
 

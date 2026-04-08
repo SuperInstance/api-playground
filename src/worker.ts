@@ -1,5 +1,6 @@
+typescript
 export interface Env {
-  PLAYGROUND_HISTORY: KVNamespace;
+  // No environment variables needed for this playground
 }
 
 interface Endpoint {
@@ -10,687 +11,705 @@ interface Endpoint {
   description: string;
 }
 
+interface TestRequest {
+  endpoint: string;
+  method: string;
+  headers: Record<string, string>;
+  body?: string;
+}
+
+interface TestResponse {
+  status: number;
+  statusText: string;
+  headers: Record<string, string>;
+  body: string;
+  time: number;
+}
+
 interface HistoryItem {
   id: string;
   timestamp: number;
-  method: string;
-  url: string;
-  status: number;
-  duration: number;
+  request: TestRequest;
+  response: TestResponse;
 }
 
 const ENDPOINTS: Endpoint[] = [
-  { id: "1", name: "Get Users", method: "GET", path: "/api/users", description: "Retrieve list of users" },
-  { id: "2", name: "Create User", method: "POST", path: "/api/users", description: "Create a new user" },
-  { id: "3", name: "Get Orders", method: "GET", path: "/api/orders", description: "Retrieve user orders" },
-  { id: "4", name: "Health Check", method: "GET", path: "/health", description: "Service health status" },
+  { id: "users-list", name: "List Users", method: "GET", path: "/api/users", description: "Retrieve all users" },
+  { id: "user-get", name: "Get User", method: "GET", path: "/api/users/{id}", description: "Retrieve specific user" },
+  { id: "user-create", name: "Create User", method: "POST", path: "/api/users", description: "Create new user" },
+  { id: "products-list", name: "List Products", method: "GET", path: "/api/products", description: "Retrieve all products" },
+  { id: "order-create", name: "Create Order", method: "POST", path: "/api/orders", description: "Create new order" },
 ];
 
 const HTML_TEMPLATE = `<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>API Playground | Fleet</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --dark: #0a0a0f;
-      --darker: #050508;
-      --light: #f8fafc;
-      --accent: #f59e0b;
-      --accent-dark: #d97706;
-      --gray: #334155;
-      --gray-light: #64748b;
-      --border: #1e293b;
-      --success: #10b981;
-      --error: #ef4444;
-    }
-    
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    
-    body {
-      font-family: 'Inter', sans-serif;
-      background: var(--dark);
-      color: var(--light);
-      min-height: 100vh;
-      line-height: 1.6;
-    }
-    
-    .container {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 0 20px;
-    }
-    
-    header {
-      background: var(--darker);
-      border-bottom: 1px solid var(--border);
-      padding: 1.5rem 0;
-    }
-    
-    .header-content {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    
-    .logo-icon {
-      width: 32px;
-      height: 32px;
-      background: var(--accent);
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      color: var(--dark);
-    }
-    
-    .logo-text {
-      font-size: 1.5rem;
-      font-weight: 700;
-      background: linear-gradient(135deg, var(--accent), #fbbf24);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    
-    .hero {
-      text-align: center;
-      padding: 4rem 0 3rem;
-      max-width: 800px;
-      margin: 0 auto;
-    }
-    
-    .hero h1 {
-      font-size: 3.5rem;
-      font-weight: 800;
-      margin-bottom: 1rem;
-      background: linear-gradient(135deg, var(--light), #cbd5e1);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    
-    .hero p {
-      font-size: 1.25rem;
-      color: var(--gray-light);
-      margin-bottom: 2rem;
-    }
-    
-    .app {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 2rem;
-      margin-bottom: 4rem;
-    }
-    
-    @media (max-width: 1024px) {
-      .app {
-        grid-template-columns: 1fr;
-      }
-    }
-    
-    .panel {
-      background: var(--darker);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      overflow: hidden;
-    }
-    
-    .panel-header {
-      padding: 1.25rem 1.5rem;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    
-    .panel-title {
-      font-size: 1.125rem;
-      font-weight: 600;
-    }
-    
-    .panel-content {
-      padding: 1.5rem;
-    }
-    
-    .form-group {
-      margin-bottom: 1.5rem;
-    }
-    
-    label {
-      display: block;
-      font-size: 0.875rem;
-      font-weight: 500;
-      margin-bottom: 0.5rem;
-      color: var(--gray-light);
-    }
-    
-    select, input, textarea {
-      width: 100%;
-      padding: 0.75rem 1rem;
-      background: var(--dark);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--light);
-      font-family: 'Inter', sans-serif;
-      font-size: 0.9375rem;
-      transition: border-color 0.2s;
-    }
-    
-    select:focus, input:focus, textarea:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
-    
-    .method-select {
-      display: flex;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
-    }
-    
-    .method-btn {
-      padding: 0.5rem 1rem;
-      background: var(--dark);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      color: var(--light);
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    
-    .method-btn:hover {
-      background: var(--gray);
-    }
-    
-    .method-btn.active {
-      background: var(--accent);
-      color: var(--dark);
-      border-color: var(--accent);
-    }
-    
-    .btn {
-      padding: 0.75rem 1.5rem;
-      background: var(--accent);
-      color: var(--dark);
-      border: none;
-      border-radius: 8px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    
-    .btn:hover {
-      background: var(--accent-dark);
-    }
-    
-    .btn-secondary {
-      background: var(--gray);
-      color: var(--light);
-    }
-    
-    .btn-secondary:hover {
-      background: var(--gray-light);
-    }
-    
-    .btn-icon {
-      width: 20px;
-      height: 20px;
-    }
-    
-    .response-container {
-      height: 400px;
-      overflow: auto;
-    }
-    
-    .response-status {
-      display: inline-flex;
-      align-items: center;
-      padding: 0.25rem 0.75rem;
-      border-radius: 9999px;
-      font-size: 0.875rem;
-      font-weight: 600;
-      margin-bottom: 1rem;
-    }
-    
-    .status-success {
-      background: rgba(16, 185, 129, 0.1);
-      color: var(--success);
-    }
-    
-    .status-error {
-      background: rgba(239, 68, 68, 0.1);
-      color: var(--error);
-    }
-    
-    pre {
-      background: var(--dark);
-      padding: 1rem;
-      border-radius: 8px;
-      overflow: auto;
-      font-size: 0.875rem;
-      line-height: 1.5;
-    }
-    
-    .history-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-    
-    .history-item {
-      background: var(--dark);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 1rem;
-      cursor: pointer;
-      transition: border-color 0.2s;
-    }
-    
-    .history-item:hover {
-      border-color: var(--accent);
-    }
-    
-    .history-method {
-      display: inline-block;
-      padding: 0.25rem 0.75rem;
-      background: var(--accent);
-      color: var(--dark);
-      border-radius: 4px;
-      font-weight: 600;
-      font-size: 0.75rem;
-      margin-right: 0.75rem;
-    }
-    
-    .history-url {
-      font-family: monospace;
-      font-size: 0.875rem;
-      color: var(--light);
-    }
-    
-    .history-status {
-      float: right;
-      font-weight: 600;
-    }
-    
-    .footer {
-      background: var(--darker);
-      border-top: 1px solid var(--border);
-      padding: 3rem 0;
-      margin-top: 4rem;
-    }
-    
-    .footer-content {
-      text-align: center;
-    }
-    
-    .footer-logo {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: var(--accent);
-      margin-bottom: 1rem;
-    }
-    
-    .footer-text {
-      color: var(--gray-light);
-      max-width: 600px;
-      margin: 0 auto 2rem;
-    }
-    
-    .loading {
-      display: inline-block;
-      width: 20px;
-      height: 20px;
-      border: 2px solid var(--gray-light);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-    
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    
-    .hidden {
-      display: none;
-    }
-    
-    .notification {
-      position: fixed;
-      bottom: 2rem;
-      right: 2rem;
-      padding: 1rem 1.5rem;
-      background: var(--success);
-      color: var(--dark);
-      border-radius: 8px;
-      font-weight: 600;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-      z-index: 1000;
-      animation: slideIn 0.3s ease;
-    }
-    
-    @keyframes slideIn {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fleet API Playground</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src *">
+    <style>
+        :root {
+            --dark-bg: #0a0a0f;
+            --dark-card: #111118;
+            --dark-border: #22222f;
+            --dark-text: #e0e0e0;
+            --dark-text-secondary: #a0a0b0;
+            --accent: #f59e0b;
+            --accent-hover: #fbbf24;
+            --success: #10b981;
+            --error: #ef4444;
+            --warning: #f59e0b;
+            --info: #3b82f6;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background-color: var(--dark-bg);
+            color: var(--dark-text);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--dark-border);
+            margin-bottom: 30px;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .logo h1 {
+            font-size: 24px;
+            color: var(--accent);
+        }
+        
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--accent) 0%, #f97316 100%);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: var(--dark-bg);
+        }
+        
+        .main-layout {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            height: calc(100vh - 150px);
+        }
+        
+        .sidebar {
+            background: var(--dark-card);
+            border-radius: 8px;
+            padding: 20px;
+            border: 1px solid var(--dark-border);
+            overflow-y: auto;
+        }
+        
+        .content {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .card {
+            background: var(--dark-card);
+            border-radius: 8px;
+            padding: 20px;
+            border: 1px solid var(--dark-border);
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--dark-border);
+        }
+        
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--accent);
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            background: var(--accent);
+            color: var(--dark-bg);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        
+        .btn:hover {
+            background: var(--accent-hover);
+        }
+        
+        .btn-secondary {
+            background: transparent;
+            color: var(--accent);
+            border: 1px solid var(--accent);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(245, 158, 11, 0.1);
+        }
+        
+        .endpoint-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .endpoint-item {
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .endpoint-item:hover {
+            border-color: var(--accent);
+            background: rgba(245, 158, 11, 0.05);
+        }
+        
+        .endpoint-item.active {
+            border-color: var(--accent);
+            background: rgba(245, 158, 11, 0.1);
+        }
+        
+        .endpoint-method {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-right: 8px;
+        }
+        
+        .method-get { background: #10b981; color: white; }
+        .method-post { background: #3b82f6; color: white; }
+        .method-put { background: #f59e0b; color: white; }
+        .method-delete { background: #ef4444; color: white; }
+        
+        .endpoint-path {
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            color: var(--dark-text);
+        }
+        
+        .endpoint-desc {
+            font-size: 12px;
+            color: var(--dark-text-secondary);
+            margin-top: 4px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--dark-text-secondary);
+        }
+        
+        select, input, textarea {
+            width: 100%;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--dark-border);
+            border-radius: 4px;
+            color: var(--dark-text);
+            font-family: inherit;
+        }
+        
+        textarea {
+            min-height: 120px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            resize: vertical;
+        }
+        
+        .headers-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .header-row {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .header-row input {
+            flex: 1;
+        }
+        
+        .response-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .response-info {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--dark-border);
+        }
+        
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .status-2xx { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .status-4xx { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+        .status-5xx { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+        
+        .response-body {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+            padding: 15px;
+            overflow: auto;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .history-item {
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            border-left: 3px solid var(--accent);
+            cursor: pointer;
+        }
+        
+        .history-method {
+            font-weight: 600;
+            color: var(--accent);
+        }
+        
+        .history-path {
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            margin: 5px 0;
+        }
+        
+        .history-time {
+            font-size: 11px;
+            color: var(--dark-text-secondary);
+        }
+        
+        footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid var(--dark-border);
+            text-align: center;
+            color: var(--dark-text-secondary);
+            font-size: 14px;
+        }
+        
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 10px;
+        }
+        
+        .footer-links a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        
+        .footer-links a:hover {
+            text-decoration: underline;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--dark-border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .hidden { display: none; }
+        
+        @media (max-width: 1024px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+            
+            .sidebar {
+                max-height: 400px;
+            }
+        }
+    </style>
 </head>
 <body>
-  <header>
-    <div class="container header-content">
-      <div class="logo">
-        <div class="logo-icon">API</div>
-        <div class="logo-text">Playground</div>
-      </div>
-      <div>
-        <button class="btn btn-secondary" onclick="loadHistory()">
-          <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-          History
-        </button>
-      </div>
-    </div>
-  </header>
-  
-  <main class="container">
-    <div class="hero">
-      <h1>API Playground</h1>
-      <p>Interactive playground for testing Fleet endpoints. Build requests, inspect responses, and share your tests.</p>
-    </div>
-    
-    <div class="app">
-      <div class="panel">
-        <div class="panel-header">
-          <div class="panel-title">Request Builder</div>
-          <div>
-            <button class="btn" onclick="sendRequest()" id="send-btn">
-              <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
-              </svg>
-              Send Request
-            </button>
-            <div class="loading hidden" id="loading"></div>
-          </div>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <div class="logo-icon">F</div>
+                <h1>Fleet API Playground</h1>
+            </div>
+            <div>
+                <button class="btn" onclick="shareRequest()">Share Request</button>
+            </div>
+        </header>
+        
+        <div class="main-layout">
+            <div class="sidebar">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">API Endpoints</div>
+                    </div>
+                    <div class="endpoint-list" id="endpointList"></div>
+                </div>
+                
+                <div class="card" style="margin-top: 20px;">
+                    <div class="card-header">
+                        <div class="card-title">Request History</div>
+                        <button class="btn btn-secondary" onclick="clearHistory()">Clear</button>
+                    </div>
+                    <div class="history-list" id="historyList"></div>
+                </div>
+            </div>
+            
+            <div class="content">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">Request Builder</div>
+                        <button class="btn" onclick="sendRequest()" id="sendBtn">
+                            Send Request
+                        </button>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="endpointSelect">Endpoint</label>
+                        <select id="endpointSelect" onchange="loadEndpoint()"></select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="methodSelect">HTTP Method</label>
+                        <select id="methodSelect">
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                            <option value="PUT">PUT</option>
+                            <option value="DELETE">DELETE</option>
+                            <option value="PATCH">PATCH</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="urlInput">Request URL</label>
+                        <input type="text" id="urlInput" placeholder="https://api.example.com/endpoint">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Headers</label>
+                        <div class="headers-list" id="headersList">
+                            <div class="header-row">
+                                <input type="text" placeholder="Header name" value="Authorization">
+                                <input type="text" placeholder="Header value" value="Bearer your-token-here">
+                                <button class="btn btn-secondary" onclick="removeHeader(this)">Remove</button>
+                            </div>
+                        </div>
+                        <button class="btn btn-secondary" onclick="addHeader()" style="margin-top: 10px;">Add Header</button>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="bodyInput">Request Body (JSON)</label>
+                        <textarea id="bodyInput" placeholder="{ \"key\": \"value\" }"></textarea>
+                    </div>
+                </div>
+                
+                <div class="card response-section">
+                    <div class="card-header">
+                        <div class="card-title">Response</div>
+                    </div>
+                    
+                    <div class="response-info" id="responseInfo" style="display: none;">
+                        <div class="status-badge" id="statusBadge">200 OK</div>
+                        <div id="responseTime">Time: 0ms</div>
+                        <div id="responseSize">Size: 0B</div>
+                    </div>
+                    
+                    <div class="response-body" id="responseBody">
+                        // Response will appear here
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="panel-content">
-          <div class="form-group">
-            <label for="endpoint-select">Select Endpoint</label>
-            <select id="endpoint-select" onchange="onEndpointChange()">
-              <option value="">Custom request</option>
-            </select>
-          </div>
-          
-          <div class="method-select">
-            <button class="method-btn active" data-method="GET">GET</button>
-            <button class="method-btn" data-method="POST">POST</button>
-            <button class="method-btn" data-method="PUT">PUT</button>
-            <button class="method-btn" data-method="DELETE">DELETE</button>
-            <button class="method-btn" data-method="PATCH">PATCH</button>
-          </div>
-          
-          <div class="form-group">
-            <label for="url">URL</label>
-            <input type="text" id="url" placeholder="https://api.example.com/endpoint" value="">
-          </div>
-          
-          <div class="form-group">
-            <label for="auth-header">Authorization Header</label>
-            <input type="text" id="auth-header" placeholder="Bearer token_here">
-          </div>
-          
-          <div class="form-group">
-            <label for="request-body">Request Body (JSON)</label>
-            <textarea id="request-body" rows="8" placeholder="{ \"key\": \"value\" }"></textarea>
-          </div>
-          
-          <div class="form-group">
-            <label for="headers">Additional Headers (JSON)</label>
-            <textarea id="headers" rows="4" placeholder="{ \"Content-Type\": \"application/json\" }">{ "Content-Type": "application/json" }</textarea>
-          </div>
-        </div>
-      </div>
-      
-      <div class="panel">
-        <div class="panel-header">
-          <div class="panel-title">Response Viewer</div>
-          <button class="btn btn-secondary" onclick="copyResponse()">
-            <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-            </svg>
-            Copy
-          </button>
-        </div>
-        <div class="panel-content">
-          <div id="response-status" class="response-status hidden"></div>
-          <div class="response-container">
-            <pre id="response-body">Response will appear here...</pre>
-          </div>
-        </div>
-      </div>
+        
+        <footer>
+            <div>Fleet API Playground v1.0</div>
+            <div class="footer-links">
+                <a href="/health">Health Check</a>
+                <a href="/api/endpoints">API Endpoints</a>
+                <a href="https://fleet.example.com/docs" target="_blank">Documentation</a>
+                <a href="https://github.com/fleet/api" target="_blank">GitHub</a>
+            </div>
+        </footer>
     </div>
     
-    <div class="panel">
-      <div class="panel-header">
-        <div class="panel-title">Request History</div>
-        <button class="btn btn-secondary" onclick="clearHistory()">Clear History</button>
-      </div>
-      <div class="panel-content">
-        <div class="history-list" id="history-list">
-          <div class="history-item">
-            <span class="history-method">GET</span>
-            <span class="history-url">/api/endpoints</span>
-            <span class="history-status status-success">200</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </main>
-  
-  <footer class="footer">
-    <div class="container footer-content">
-      <div class="footer-logo">Fleet API</div>
-      <p class="footer-text">API Playground is part of the Fleet ecosystem. Build, test, and deploy with confidence.</p>
-      <p class="footer-text">© 2024 Fleet API. All rights reserved.</p>
-    </div>
-  </footer>
-  
-  <div id="notification" class="notification hidden"></div>
-  
-  <script>
-    let currentMethod = 'GET';
-    let endpoints = [];
-    
-    document.addEventListener('DOMContentLoaded', async () => {
-      loadEndpoints();
-      loadHistory();
-      setupMethodButtons();
-      
-      document.getElementById('url').value = window.location.origin + '/api/endpoints';
-    });
-    
-    function setupMethodButtons() {
-      document.querySelectorAll('.method-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          document.querySelectorAll('.method-btn').forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          currentMethod = btn.dataset.method;
-        });
-      });
-    }
-    
-    async function loadEndpoints() {
-      try {
-        const response = await fetch('/api/endpoints');
-        endpoints = await response.json();
-        const select = document.getElementById('endpoint-select');
-        select.innerHTML = '<option value="">Custom request</option>';
-        endpoints.forEach(endpoint => {
-          const option = document.createElement('option');
-          option.value = endpoint.id;
-          option.textContent = endpoint.name + ' (' + endpoint.method + ' ' + endpoint.path + ')';
-          select.appendChild(option);
-        });
-      } catch (error) {
-        console.error('Failed to load endpoints:', error);
-      }
-    }
-    
-    function onEndpointChange() {
-      const select = document.getElementById('endpoint-select');
-      const selectedId = select.value;
-      const endpoint = endpoints.find(e => e.id === selectedId);
-      
-      if (endpoint) {
-        currentMethod = endpoint.method;
-        document.querySelectorAll('.method-btn').forEach(btn => {
-          btn.classList.toggle('active', btn.dataset.method === endpoint.method);
-        });
-        document.getElementById('url').value = window.location.origin + endpoint.path;
-      }
-    }
-    
-    async function sendRequest() {
-      const url = document.getElementById('url').value;
-      const authHeader = document.getElementById('auth-header').value;
-      const requestBody = document.getElementById('request-body').value;
-      const headersText = document.getElementById('headers').value;
-      
-      if (!url) {
-        showNotification('Please enter a URL', 'error');
-        return;
-      }
-      
-      const sendBtn = document.getElementById('send-btn');
-      const loading = document.getElementById('loading');
-      sendBtn.classList.add('hidden');
-      loading.classList.remove('hidden');
-      
-      const startTime = Date.now();
-      
-      try {
-        const headers = {};
-        if (authHeader) {
-          headers['Authorization'] = authHeader;
+    <script>
+        let endpoints = [];
+        let history = JSON.parse(localStorage.getItem('fleetApiHistory') || '[]');
+        let currentEndpoint = null;
+        
+        function init() {
+            loadEndpoints();
+            renderEndpoints();
+            renderHistory();
+            updateUrlFromEndpoint();
+            
+            // Load from URL hash if present
+            const hash = window.location.hash.substring(1);
+            if (hash) {
+                try {
+                    const saved = JSON.parse(atob(hash));
+                    loadSavedRequest(saved);
+                } catch (e) {
+                    console.error('Failed to load from URL hash:', e);
+                }
+            }
         }
         
-        try {
-          const additionalHeaders = JSON.parse(headersText);
-          Object.assign(headers, additionalHeaders);
-        } catch (e) {
-          console.warn('Invalid headers JSON, using default');
-          headers['Content-Type'] = 'application/json';
+        async function loadEndpoints() {
+            try {
+                const response = await fetch('/api/endpoints');
+                endpoints = await response.json();
+                renderEndpoints();
+            } catch (error) {
+                console.error('Failed to load endpoints:', error);
+                endpoints = ${JSON.stringify(ENDPOINTS)};
+                renderEndpoints();
+            }
         }
         
-        const options = {
-          method: currentMethod,
-          headers: headers
-        };
-        
-        if (requestBody && ['POST', 'PUT', 'PATCH'].includes(currentMethod)) {
-          try {
-            JSON.parse(requestBody);
-            options.body = requestBody;
-          } catch (e) {
-            showNotification('Invalid JSON in request body', 'error');
-            return;
-          }
+        function renderEndpoints() {
+            const endpointList = document.getElementById('endpointList');
+            const endpointSelect = document.getElementById('endpointSelect');
+            
+            endpointList.innerHTML = '';
+            endpointSelect.innerHTML = '<option value="">Custom endpoint</option>';
+            
+            endpoints.forEach(endpoint => {
+                // Add to list
+                const item = document.createElement('div');
+                item.className = 'endpoint-item';
+                item.dataset.id = endpoint.id;
+                item.innerHTML = \`
+                    <div>
+                        <span class="endpoint-method method-\${endpoint.method.toLowerCase()}">\${endpoint.method}</span>
+                        <span class="endpoint-path">\${endpoint.path}</span>
+                    </div>
+                    <div class="endpoint-desc">\${endpoint.description}</div>
+                \`;
+                item.onclick = () => selectEndpoint(endpoint.id);
+                endpointList.appendChild(item);
+                
+                // Add to select
+                const option = document.createElement('option');
+                option.value = endpoint.id;
+                option.textContent = \`\${endpoint.method} \${endpoint.path} - \${endpoint.description}\`;
+                endpointSelect.appendChild(option);
+            });
         }
         
-        const response = await fetch('/api/test', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            url: url,
-            method: currentMethod,
-            headers: headers,
-            body: requestBody
-          })
-        });
+        function selectEndpoint(endpointId) {
+            const endpoint = endpoints.find(e => e.id === endpointId);
+            if (!endpoint) return;
+            
+            currentEndpoint = endpoint;
+            
+            // Update UI
+            document.querySelectorAll('.endpoint-item').forEach(item => {
+                item.classList.toggle('active', item.dataset.id === endpointId);
+            });
+            
+            document.getElementById('endpointSelect').value = endpointId;
+            document.getElementById('methodSelect').value = endpoint.method;
+            document.getElementById('urlInput').value = endpoint.path;
+            
+            // Clear body for GET requests
+            if (endpoint.method === 'GET') {
+                document.getElementById('bodyInput').value = '';
+            }
+        }
         
-        const duration = Date.now() - startTime;
-        const result = await response.json();
+        function loadEndpoint() {
+            const endpointId = document.getElementById('endpointSelect').value;
+            if (endpointId) {
+                selectEndpoint(endpointId);
+            } else {
+                currentEndpoint = null;
+                document.querySelectorAll('.endpoint-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+            }
+        }
         
-        displayResponse(result, duration);
-        saveToHistory(url, currentMethod, result.status, duration);
-        loadHistory();
+        function updateUrlFromEndpoint() {
+            const method = document.getElementById('methodSelect').value;
+            const url = document.getElementById('urlInput').value;
+            
+            if (currentEndpoint && currentEndpoint.method === method && currentEndpoint.path === url) {
+                return;
+            }
+            
+            currentEndpoint = null;
+            document.querySelectorAll('.endpoint-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            document.getElementById('endpointSelect').value = '';
+        }
         
-      } catch (error) {
-        displayResponse({
-          status: 0,
-          body: 'Request failed: ' + error.message,
-          headers: {}
-        }, Date.now() - startTime);
-      } finally {
-        sendBtn.classList.remove('hidden');
-        loading.classList.add('hidden');
-      }
-    }
-    
-    function displayResponse(result, duration) {
-      const statusEl = document.getElementById('response-status');
-      const bodyEl = document.getElementById('response-body');
-      
-      statusEl.classList.remove('hidden');
-      statusEl.textContent = result.status + ' • ' + duration + 'ms';
-      statusEl.className = 'response-status ' + (result.status >= 200 && result.status < 300 ? 'status-success' : 'status-error');
-      
-      try {
-        const parsedBody = typeof result.body === 'string' ? JSON.parse(result.body) : result.body;
-        bodyEl.textContent = JSON.stringify(parsedBody, null, 2);
-      } catch {
-        bodyEl.textContent = result.body;
-      }
-    }
-    
-    async function saveToHistory(url, method, status, duration) {
-      try {
-        await fetch('/api/history', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            url: url,
-            method: method,
-            status: status,
-            duration: duration
-          })
-        });
-      } catch (error) {
-        console.error('Failed to save history:', error);
-      }
-    }
-    
-    async function loadHistory() {
-      try {
-        const response = await fetch('/api/history');
-        const history = await response.json();
-        const listEl = document.getElementById('history-list');
+        function addHeader() {
+            const headersList = document.getElementById('headersList');
+            const row = document.createElement('div');
+            row.className = 'header-row';
+            row.innerHTML = \`
+                <input type="text" placeholder="Header name">
+                <input type="text" placeholder="Header value">
+                <button class="btn btn-secondary" onclick="removeHeader(this)">Remove</button>
+            \`;
+            headersList.appendChild(row);
+        }
         
-        listEl.innerHTML = '';
+        function removeHeader(button) {
+            if (document.querySelectorAll('.header-row').length > 1) {
+                button.parentElement.remove();
+            }
+        }
         
-        history.forEach(item => {
-          const itemEl = document.createElement('div');
-          itemEl.className = 'history-item';
-          itemEl.onclick = ()
-const sh = {"Content-Security-Policy":"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; frame-ancestors 'none'","X-Frame-Options":"DENY"};
-export default { async fetch(r: Request) { const u = new URL(r.url); if (u.pathname==='/health') return new Response(JSON.stringify({status:'ok'}),{headers:{'Content-Type':'application/json',...sh}}); return new Response(html,{headers:{'Content-Type':'text/html;charset=UTF-8',...sh}}); }};
+        async function sendRequest() {
+            const sendBtn = document.getElementById('sendBtn');
+            const originalText = sendBtn.textContent;
+            
+            try {
+                sendBtn.innerHTML = '<div class="loading"></div>';
+                
+                const method = document.getElementById('methodSelect').value;
+                let url = document.getElementById('urlInput').value.trim();
+                
+                // Ensure URL has protocol
+                if (!url.startsWith('http')) {
+                    url = 'https://' + url;
+                    document.getElementById('urlInput').value = url;
+                }
+                
+                // Collect headers
+                const headers = {};
+                document.querySelectorAll('.header-row').forEach(row => {
+                    const nameInput = row.querySelector('input[type="text"]:first-child');
+                    const valueInput = row.querySelector('input[type="text"]:last-child');
+                    if (nameInput.value.trim() && valueInput.value.trim()) {
+                        headers[nameInput.value.trim()] = valueInput.value.trim();
+                    }
+                });
+                
+                // Prepare body
+                const bodyInput = document.getElementById('bodyInput').value.trim();
+                let body = null;
+                if (bodyInput && method !== 'GET' && method !== 'HEAD') {
+                    try {
+                        body = JSON.stringify(JSON.parse(bodyInput));
+                    } catch (e) {
+                        showError('Invalid JSON in request body');
+                        return;
+                    }
+                }
+                
+                const startTime = Date.now();
+                
+                const response = await fetch('/api/test', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        endpoint: url,
+                        method: method,
+                        headers: headers,
+                        body: body
+                    })
+                });
+                
+                const responseData = await response.json();
+                const endTime = Date.now();
+                
+                displayResponse(responseData, endTime - startTime);
+                saveToHistory({
+                    endpoint: url,
+                    method: method,
+                    headers: headers,
+                    body: body
+                }, responseData);
+                
+            } catch (error) {
+                showError('Request failed: ' + error.message);
+            } finally {
+                sendBtn.textContent = originalText;
+            }
+        }
+        
+        function displayResponse(response, time) {
+            const responseInfo =
+const sh={"Content-Security-Policy":"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; frame-ancestors 'none'","X-Frame-Options":"DENY"};
+export default{async fetch(r:Request){const u=new URL(r.url);if(u.pathname==='/health')return new Response(JSON.stringify({status:'ok'}),{headers:{'Content-Type':'application/json',...sh}});return new Response(html,{headers:{'Content-Type':'text/html;charset=UTF-8',...sh}});}};
