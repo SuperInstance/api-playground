@@ -1,10 +1,23 @@
 # api-playground
 
-API Playground for fleet endpoints.
+**API Playground for fleet endpoints** — a Cloudflare Worker that provides an interactive testing interface for Cocapn Fleet APIs.
 
-Part of the [Cocapn fleet](https://github.com/Lucineer/the-fleet).
+## What This Gives You
 
----
-<i>Built with [Cocapn](https://github.com/Lucineer/cocapn-ai).</i>
+- **Interactive API testing** — send requests to fleet endpoints and see responses
+- **Zero config** — deploy to Cloudflare Workers and start testing
+- **Fleet-aware** — pre-configured for Cocapn Fleet API patterns
 
-Superinstance & Lucineer (DiGennaro et al.)
+## Quick Start
+
+```bash
+npx wrangler deploy
+```
+
+## How It Fits
+
+Development tool for the Cocapn Fleet. Test endpoints served by `a2a-protocol`, `bid-engine`, and other fleet services.
+
+## License
+
+MIT
